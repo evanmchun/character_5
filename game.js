@@ -36,11 +36,6 @@ const gridHelper = new THREE.GridHelper(10, 10);
 gridHelper.position.y = 0; // Grid at y = 0
 scene.add(gridHelper);
 
-// Add axes helper
-const axesHelper = new THREE.AxesHelper(5);
-axesHelper.position.y = 0; // Axes at y = 0
-scene.add(axesHelper);
-
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);

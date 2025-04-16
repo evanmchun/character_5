@@ -33,33 +33,46 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
 document.body.appendChild(renderer.domElement);
 
 // Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Increased intensity from 0.5 to 1.0
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.9); // Reduced intensity for more shadow contrast
 scene.add(ambientLight);
 
 // Main directional light (sun)
-const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-mainLight.position.set(5, 5, 2);
+const mainLight = new THREE.DirectionalLight(0xffffff, 2.0); // Increased intensity
+mainLight.position.set(50, 100, 50); // Positioned higher and further for better shadow casting
 mainLight.castShadow = true;
-mainLight.shadow.mapSize.width = 2048;
-mainLight.shadow.mapSize.height = 2048;
+
+// Improve shadow quality
+mainLight.shadow.mapSize.width = 4096;  // Increased resolution
+mainLight.shadow.mapSize.height = 4096;
 mainLight.shadow.camera.near = 0.1;
-mainLight.shadow.camera.far = 100;
+mainLight.shadow.camera.far = 500;
+mainLight.shadow.camera.left = -100;
+mainLight.shadow.camera.right = 100;
+mainLight.shadow.camera.top = 100;
+mainLight.shadow.camera.bottom = -100;
+mainLight.shadow.bias = -0.001;  // Reduce shadow acne
 scene.add(mainLight);
 
 // Fill light from the back
-const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
-backLight.position.set(-5, 3, -5);
-backLight.castShadow = false;
+const backLight = new THREE.DirectionalLight(0x5555ff, 0.3); // Slight blue tint for atmosphere
+backLight.position.set(-50, 30, -50);
+backLight.castShadow = true;
 scene.add(backLight);
 
 // Fill light from the front
-const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-fillLight.position.set(2, 2, 5);
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.9); // Warm fill light
+fillLight.position.set(20, 10, 20);
 fillLight.castShadow = false;
 scene.add(fillLight);
+
+// Ground hemisphere light for better ambient illumination
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
+hemiLight.position.set(0, 100, 0);
+scene.add(hemiLight);
 
 // Setup your camera and target offset
 const cameraOffset = new THREE.Vector3(0, 2, -10); // Lowered height from 5 to 2
@@ -417,11 +430,20 @@ gltfLoader.load(
         map.position.set(0, 0, 0);
         map.scale.set(1, 1, 1);
         
-        // Enable shadows for the map
+        // Enable shadows and remove reflections for the map
         map.traverse((child) => {
             if (child.isMesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
+                
+                // Remove all reflective properties from materials
+                if (child.material) {
+                    child.material.metalness = 0.0;  // No metallic reflection
+                    child.material.roughness = 1.0;  // Maximum roughness for matte appearance
+                    child.material.envMapIntensity = 0.0;  // No environment map reflection
+                    child.material.envMap = null;  // Remove environment map
+                    child.material.needsUpdate = true;  // Ensure material updates are applied
+                }
             }
         });
         

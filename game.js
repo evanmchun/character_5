@@ -292,132 +292,11 @@ audioLoader.load('sounds/moonwalk.mp3',
     }
 );
 
-function updateCharacterMovement() {
-    if (!character) return;
+// Add after scene setup
+const collisionObjects = [];
+const originalMaterials = new Map(); // Store original materials
 
-    // Calculate movement direction in world space
-    const moveDirection = new THREE.Vector3();
-    if (keys.w) moveDirection.z += 1;
-    if (keys.s) moveDirection.z -= 1;
-    if (keys.a) moveDirection.x += 1;
-    if (keys.d) moveDirection.x -= 1;
-
-    // Normalize movement vector
-    if (moveDirection.length() > 0) {
-        moveDirection.normalize();
-        
-        // Determine current speed and animation
-        const isSprinting = keys.shift;
-        const currentSpeed = isSprinting ? sprintSpeed : moveSpeed;
-        let targetAction;
-        
-        // Choose animation based on movement
-        if (keys.s) {
-            console.log('S key pressed, selecting moonwalk animation');
-            targetAction = moonwalkAction; // Use moonwalk when pressing S
-            
-            // Play moonwalk sound if it's loaded
-            if (moonwalkSound && !moonwalkSound.isPlaying) {
-                moonwalkSound.play();
-            }
-        } else if (isSprinting) {
-            targetAction = fastRunAction;
-            // Stop moonwalk sound if it's playing
-            if (moonwalkSound && moonwalkSound.isPlaying) {
-                moonwalkSound.stop();
-            }
-        } else {
-            targetAction = runAction;
-            // Stop moonwalk sound if it's playing
-            if (moonwalkSound && moonwalkSound.isPlaying) {
-                moonwalkSound.stop();
-            }
-        }
-        
-        // Update animation
-        if (currentAction !== targetAction) {
-            console.log('Switching to animation:', targetAction ? targetAction.getClip().name : 'none');
-            currentAction.fadeOut(0.2);
-            targetAction.reset().fadeIn(0.2).play();
-            currentAction = targetAction;
-        }
-
-        // Convert movement direction to local space (relative to character's rotation)
-        moveDirection.applyQuaternion(character.quaternion);
-
-        // Move character in the direction it's facing
-        character.position.x += moveDirection.x * currentSpeed;
-        character.position.z += moveDirection.z * currentSpeed;
-
-        // Only rotate when moving sideways (A or D)
-        if (keys.a || keys.d) {
-            // Calculate target rotation based on movement direction
-            const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
-            
-            // Get current rotation
-            const currentRotation = character.rotation.y;
-            
-            // Calculate the shortest rotation angle
-            let angleDiff = targetRotation - currentRotation;
-            
-            // Normalize the angle difference to [-PI, PI]
-            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-            
-            // Apply smooth rotation
-            character.rotation.y += angleDiff * rotateSpeed;
-            
-            // Ensure rotation stays within valid range
-            if (character.rotation.y > Math.PI) character.rotation.y -= 2 * Math.PI;
-            if (character.rotation.y < -Math.PI) character.rotation.y += 2 * Math.PI;
-        }
-    } else {
-        // Return to idle animation
-        if (currentAction !== idleAction) {
-            currentAction.fadeOut(0.2);
-            idleAction.reset().fadeIn(0.2).play();
-            currentAction = idleAction;
-        }
-        // Stop moonwalk sound if it's playing
-        if (moonwalkSound && moonwalkSound.isPlaying) {
-            moonwalkSound.stop();
-        }
-    }
-}
-
-// Animation loop
-const clock = new THREE.Clock();
-
-function animate() {
-    requestAnimationFrame(animate);
-    
-    // Update animation mixer
-    if (mixer) {
-        mixer.update(clock.getDelta());
-    }
-    
-    // Update character movement
-    updateCharacterMovement();
-    
-    // Update camera position
-    updateCamera();
-    
-    renderer.render(scene, camera);
-}
-
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-// Add error handling for WebGL
-renderer.domElement.addEventListener('webglcontextlost', (event) => {
-    console.error('WebGL context lost');
-    event.preventDefault();
-}, false);
-
+// Modify map loading section
 // Load map
 const gltfLoader = new GLTFLoader();
 gltfLoader.load(
@@ -438,11 +317,61 @@ gltfLoader.load(
                 
                 // Remove all reflective properties from materials
                 if (child.material) {
-                    child.material.metalness = 0.0;  // No metallic reflection
-                    child.material.roughness = 1.0;  // Maximum roughness for matte appearance
-                    child.material.envMapIntensity = 0.0;  // No environment map reflection
-                    child.material.envMap = null;  // Remove environment map
-                    child.material.needsUpdate = true;  // Ensure material updates are applied
+                    child.material.metalness = 0.0;
+                    child.material.roughness = 1.0;
+                    child.material.envMapIntensity = 0.0;
+                    child.material.envMap = null;
+                    child.material.needsUpdate = true;
+                }
+
+                // Add collision boxes to objects based on their names or size
+                if (child.name.toLowerCase().includes('tree') || 
+                    child.name.toLowerCase().includes('building') ||
+                    child.name.toLowerCase().includes('tower') ||
+                    child.name.toLowerCase().includes('house') ||
+                    child.name.toLowerCase().includes('structure') ||
+                    child.name.toLowerCase().includes('wall') ||
+                    child.name === 'Object_8002' ||  // Specific object name
+                    child.name === '8001') {  // Keep 8001 for now
+                    
+                    console.log('Creating collision box for:', child.name); // Debug log
+                    
+                    // Create collision box
+                    const box = new THREE.Box3().setFromObject(child);
+                    
+                    // Scale down the collision box to make it narrower
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    
+                    // Scale down the size (adjust these values to make boxes narrower)
+                    size.x *= 0.2;  // Make width 30% of original (was 0.5)
+                    size.z *= 0.4;  // Make depth 40% of original (was 0.7)
+                    
+                    // Create new scaled box
+                    const scaledBox = new THREE.Box3();
+                    scaledBox.setFromCenterAndSize(center, size);
+                    
+                    // Store the collision box and its associated object
+                    collisionObjects.push({
+                        box: scaledBox,
+                        object: child,
+                        name: child.name
+                    });
+
+                    // Store original material
+                    if (child.isMesh) {
+                        originalMaterials.set(child, child.material.clone());
+                    }
+
+                    // Make collision boxes clearly visible
+                    const helper = new THREE.Box3Helper(scaledBox, 0x00ff00);
+                    helper.material.transparent = true;
+                    helper.material.opacity = 0.5;
+                    helper.material.depthTest = false;
+                    scene.add(helper);
+                } else if (child.isMesh) {
+                    // Log all mesh names for debugging
+                    console.log('Mesh found:', child.name);
                 }
             }
         });
@@ -541,5 +470,230 @@ function createTexturedPlane(textures) {
     plane3.receiveShadow = true;
     scene.add(plane3);
 }
+
+// Modify the collision detection function
+function checkCollision(position, radius = 0.5) {
+    const characterBox = new THREE.Box3();
+    const characterSize = new THREE.Vector3(radius * 2, 2, radius * 2);
+    characterBox.setFromCenterAndSize(position, characterSize);
+
+    let collisionDetected = false;
+    
+    for (const obj of collisionObjects) {
+        if (characterBox.intersectsBox(obj.box)) {
+            collisionDetected = true;
+            
+            // Highlight the colliding object
+            if (obj.object.isMesh) {
+                // Store original material if not already stored
+                if (!originalMaterials.has(obj.object)) {
+                    originalMaterials.set(obj.object, obj.object.material.clone());
+                }
+                
+                // Create highlight material
+                const highlightMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xff0000, // Red highlight
+                    transparent: true,
+                    opacity: 0.5
+                });
+                
+                // Apply highlight material
+                obj.object.material = highlightMaterial;
+                
+                // Log detailed collision information
+                console.log(`Collision with: ${obj.name}`);
+                console.log(`Object position: ${obj.object.position.x.toFixed(2)}, ${obj.object.position.y.toFixed(2)}, ${obj.object.position.z.toFixed(2)}`);
+                console.log(`Character position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}`);
+            }
+        } else {
+            // Restore original material if not colliding
+            if (obj.object.isMesh && originalMaterials.has(obj.object)) {
+                obj.object.material = originalMaterials.get(obj.object);
+            }
+        }
+    }
+    
+    return collisionDetected;
+}
+
+// Add cleanup function to restore original materials
+function restoreOriginalMaterials() {
+    for (const [mesh, material] of originalMaterials) {
+        if (mesh && material) {
+            mesh.material = material;
+        }
+    }
+    originalMaterials.clear();
+}
+
+// Add after scene setup
+let lastLogTime = 0;
+const LOG_INTERVAL = 1000; // Log every 1000ms (1 second)
+
+// Modify updateCharacterMovement function
+function updateCharacterMovement() {
+    if (!character) return;
+
+    // Log position information periodically
+    const currentTime = Date.now();
+    if (currentTime - lastLogTime > LOG_INTERVAL) {
+        console.log('Character Position:', {
+            x: character.position.x.toFixed(2),
+            y: character.position.y.toFixed(2),
+            z: character.position.z.toFixed(2)
+        });
+        
+        // Log nearby objects
+        scene.traverse((child) => {
+            if (child.isMesh && child.name.includes('Object_8')) {
+                const distance = child.position.distanceTo(character.position);
+                if (distance < 10) { // Only log objects within 10 units
+                    console.log('Nearby Object:', {
+                        name: child.name,
+                        position: {
+                            x: child.position.x.toFixed(2),
+                            y: child.position.y.toFixed(2),
+                            z: child.position.z.toFixed(2)
+                        },
+                        distance: distance.toFixed(2)
+                    });
+                }
+            }
+        });
+        
+        lastLogTime = currentTime;
+    }
+
+    // Calculate movement direction in world space
+    const moveDirection = new THREE.Vector3();
+    if (keys.w) moveDirection.z += 1;
+    if (keys.s) moveDirection.z -= 1;
+    if (keys.a) moveDirection.x += 1;
+    if (keys.d) moveDirection.x -= 1;
+
+    // Normalize movement vector
+    if (moveDirection.length() > 0) {
+        moveDirection.normalize();
+        
+        // Determine current speed and animation
+        const isSprinting = keys.shift;
+        const currentSpeed = isSprinting ? sprintSpeed : moveSpeed;
+        let targetAction;
+        
+        // Choose animation based on movement
+        if (keys.s) {
+            console.log('S key pressed, selecting moonwalk animation');
+            targetAction = moonwalkAction; // Use moonwalk when pressing S
+            
+            // Play moonwalk sound if it's loaded
+            if (moonwalkSound && !moonwalkSound.isPlaying) {
+                moonwalkSound.play();
+            }
+        } else if (isSprinting) {
+            targetAction = fastRunAction;
+            // Stop moonwalk sound if it's playing
+            if (moonwalkSound && moonwalkSound.isPlaying) {
+                moonwalkSound.stop();
+            }
+        } else {
+            targetAction = runAction;
+            // Stop moonwalk sound if it's playing
+            if (moonwalkSound && moonwalkSound.isPlaying) {
+                moonwalkSound.stop();
+            }
+        }
+        
+        // Update animation
+        if (currentAction !== targetAction) {
+            console.log('Switching to animation:', targetAction ? targetAction.getClip().name : 'none');
+            currentAction.fadeOut(0.2);
+            targetAction.reset().fadeIn(0.2).play();
+            currentAction = targetAction;
+        }
+
+        // Convert movement direction to local space (relative to character's rotation)
+        moveDirection.applyQuaternion(character.quaternion);
+
+        // Calculate new position
+        const newPosition = character.position.clone();
+        newPosition.x += moveDirection.x * currentSpeed;
+        newPosition.z += moveDirection.z * currentSpeed;
+
+        // Check for collisions before applying movement
+        if (!checkCollision(newPosition)) {
+            // No collision, apply movement
+            character.position.copy(newPosition);
+        } else {
+            console.log('Collision prevented movement');
+        }
+
+        // Only rotate when moving sideways (A or D)
+        if (keys.a || keys.d) {
+            // Calculate target rotation based on movement direction
+            const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+            
+            // Get current rotation
+            const currentRotation = character.rotation.y;
+            
+            // Calculate the shortest rotation angle
+            let angleDiff = targetRotation - currentRotation;
+            
+            // Normalize the angle difference to [-PI, PI]
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+            
+            // Apply smooth rotation
+            character.rotation.y += angleDiff * rotateSpeed;
+            
+            // Ensure rotation stays within valid range
+            if (character.rotation.y > Math.PI) character.rotation.y -= 2 * Math.PI;
+            if (character.rotation.y < -Math.PI) character.rotation.y += 2 * Math.PI;
+        }
+    } else {
+        // Return to idle animation
+        if (currentAction !== idleAction) {
+            currentAction.fadeOut(0.2);
+            idleAction.reset().fadeIn(0.2).play();
+            currentAction = idleAction;
+        }
+        // Stop moonwalk sound if it's playing
+        if (moonwalkSound && moonwalkSound.isPlaying) {
+            moonwalkSound.stop();
+        }
+    }
+}
+
+// Animation loop
+const clock = new THREE.Clock();
+
+function animate() {
+    requestAnimationFrame(animate);
+    
+    // Update animation mixer
+    if (mixer) {
+        mixer.update(clock.getDelta());
+    }
+    
+    // Update character movement
+    updateCharacterMovement();
+    
+    // Update camera position
+    updateCamera();
+    
+    renderer.render(scene, camera);
+}
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Add error handling for WebGL
+renderer.domElement.addEventListener('webglcontextlost', (event) => {
+    console.error('WebGL context lost');
+    event.preventDefault();
+}, false);
 
 animate(); 

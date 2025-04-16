@@ -131,7 +131,7 @@ let moveLeft = false;
 let moveRight = false;
 const moveSpeed = 0.02;
 const sprintSpeed = 0.05; // Faster speed when sprinting
-const rotateSpeed = 0.5;
+const rotateSpeed = 0.05; // Reduced from 0.5 to 0.1 for slower turning
 
 // Keyboard controls
 const keys = {
@@ -258,7 +258,7 @@ loader.load('character/ch_idle.fbx',
 function updateCharacterMovement() {
     if (!character) return;
 
-    // Calculate movement direction
+    // Calculate movement direction in world space
     const moveDirection = new THREE.Vector3();
     if (keys.w) moveDirection.z += 1;
     if (keys.s) moveDirection.z -= 1;
@@ -281,13 +281,28 @@ function updateCharacterMovement() {
             currentAction = targetAction;
         }
 
-        // Calculate rotation
-        const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
-        character.rotation.y = THREE.MathUtils.lerp(character.rotation.y, targetRotation, rotateSpeed);
+        // Convert movement direction to local space (relative to character's rotation)
+        moveDirection.applyQuaternion(character.quaternion);
 
-        // Move character
+        // Move character in the direction it's facing
         character.position.x += moveDirection.x * currentSpeed;
         character.position.z += moveDirection.z * currentSpeed;
+
+        // Only rotate when moving sideways (A or D)
+        if (keys.a || keys.d) {
+            const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+            
+            // Handle angle wrapping for smooth rotation
+            let currentRotation = character.rotation.y;
+            let diff = targetRotation - currentRotation;
+            
+            // Normalize the difference to the shortest path
+            if (diff > Math.PI) diff -= 2 * Math.PI;
+            if (diff < -Math.PI) diff += 2 * Math.PI;
+            
+            // Apply the rotation
+            character.rotation.y = currentRotation + diff * rotateSpeed;
+        }
     } else {
         // Return to idle animation
         if (currentAction !== idleAction) {

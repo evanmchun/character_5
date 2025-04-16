@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // Audio setup
 const audioLoader = new THREE.AudioLoader();
@@ -33,24 +34,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
-
-// Add a ground plane
-const groundGeometry = new THREE.PlaneGeometry(10, 10);
-const groundMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x808080,
-    roughness: 0.8,
-    metalness: 0.2
-});
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-ground.rotation.x = -Math.PI / 2;
-ground.position.y = 0; // Ground at y = 0
-ground.receiveShadow = true;
-scene.add(ground);
-
-// Add a grid helper
-const gridHelper = new THREE.GridHelper(10, 10);
-gridHelper.position.y = 0; // Grid at y = 0
-scene.add(gridHelper);
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Increased intensity from 0.5 to 1.0
@@ -174,7 +157,7 @@ loader.load('character/ch_idle.fbx',
         character = fbx;
         
         // Reset transformations
-        character.position.set(0, 0, 0);
+        character.position.set(0, 1, 0); // Changed y position to 1 to lift character above the plane
         character.rotation.set(0, 0, 0);
         character.scale.set(1, 1, 1);
         
@@ -201,7 +184,7 @@ loader.load('character/ch_idle.fbx',
         scene.add(character);
         
         // Position the character manually
-        character.position.y = 0; // Start at ground level
+        character.position.y = 1; // Changed y position to 1 to lift character above the plane
         
         // Add transparent bounding box
         const boxHelper = new THREE.BoxHelper(character, 0xffff00);
@@ -414,5 +397,120 @@ renderer.domElement.addEventListener('webglcontextlost', (event) => {
     console.error('WebGL context lost');
     event.preventDefault();
 }, false);
+
+// Load map
+const gltfLoader = new GLTFLoader();
+gltfLoader.load(
+    'map/low-poly-eiffel-tower/source/map_effel.glb',
+    (gltf) => {
+        console.log('Map loaded successfully');
+        const map = gltf.scene;
+        
+        // Adjust map position and scale
+        map.position.set(0, 0, 0);
+        map.scale.set(1, 1, 1);
+        
+        // Enable shadows for the map
+        map.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        
+        scene.add(map);
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% map loaded');
+    },
+    (error) => {
+        console.error('Error loading map:', error);
+    }
+);
+
+// Create a textured plane
+const textureLoader = new THREE.TextureLoader();
+const textures = [
+    'map/low-poly-eiffel-tower/source/textures/Image_0_0.png',
+    'map/low-poly-eiffel-tower/source/textures/Image_0_1.png',
+    'map/low-poly-eiffel-tower/source/textures/Image_0_2.png'
+];
+
+// Load all textures
+const loadedTextures = [];
+let texturesLoaded = 0;
+
+textures.forEach((texturePath, index) => {
+    textureLoader.load(
+        texturePath,
+        (texture) => {
+            console.log(`Texture ${index} loaded successfully`);
+            loadedTextures[index] = texture;
+            texturesLoaded++;
+            
+            // If all textures are loaded, create the plane
+            if (texturesLoaded === textures.length) {
+                createTexturedPlane(loadedTextures);
+            }
+        },
+        (xhr) => {
+            console.log((xhr.loaded / xhr.total * 100) + `% texture ${index} loaded`);
+        },
+        (error) => {
+            console.error(`Error loading texture ${index}:`, error);
+        }
+    );
+});
+
+function createTexturedPlane(textures) {
+    // Create plane geometry
+    const planeGeometry = new THREE.PlaneGeometry(10, 10);
+    
+    // Create material with the first texture
+    const planeMaterial = new THREE.MeshStandardMaterial({
+        map: textures[0],
+        side: THREE.DoubleSide
+    });
+    
+    // Create mesh
+    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    
+    // Position and rotate the plane
+    plane.rotation.x = -Math.PI / 2; // Rotate to be horizontal
+    plane.position.y = -0.5; // Position slightly below ground level
+    
+    // Enable shadows
+    plane.receiveShadow = true;
+    
+    scene.add(plane);
+    
+    // Add a second plane with a different texture
+    const plane2 = new THREE.Mesh(
+        planeGeometry,
+        new THREE.MeshStandardMaterial({
+            map: textures[1],
+            side: THREE.DoubleSide
+        })
+    );
+    plane2.rotation.x = -Math.PI / 2;
+    plane2.position.y = -0.5;
+    plane2.position.x = 10; // Position next to the first plane
+    plane2.receiveShadow = true;
+    scene.add(plane2);
+    
+    // Add a third plane with another texture
+    const plane3 = new THREE.Mesh(
+        planeGeometry,
+        new THREE.MeshStandardMaterial({
+            map: textures[2],
+            side: THREE.DoubleSide
+        })
+    );
+    plane3.rotation.x = -Math.PI / 2;
+    plane3.position.y = -0.5;
+    plane3.position.x = -10; // Position on the other side
+    plane3.receiveShadow = true;
+    scene.add(plane3);
+}
 
 animate(); 

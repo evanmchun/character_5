@@ -77,9 +77,9 @@ scene.add(hemiLight);
 // Setup your camera and target offset
 const cameraOffset = new THREE.Vector3(0, 2, -10); // Lowered height from 5 to 2
 const targetPosition = new THREE.Vector3();
-const minDistance = 1; // Reduced minimum distance from 3 to 1
+const minDistance = .75; // Reduced minimum distance from 3 to 1
 const maxDistance = 20;
-let currentDistance = 10;
+let currentDistance = 7;
 
 // Mouse rotation controls
 let rotation = new THREE.Vector2(); // yaw only
@@ -170,8 +170,8 @@ loader.load('character/ch_idle.fbx',
         character = fbx;
         
         // Reset transformations
-        character.position.set(0, 1, 0); // Changed y position to 1 to lift character above the plane
-        character.rotation.set(0, 0, 0);
+        character.position.set(6.5, 1, -7); // Changed to specified starting position
+        character.rotation.set(0, Math.PI*.25, 0); // Rotated 180 degrees to face camera
         character.scale.set(1, 1, 1);
         
         // Set the scale

@@ -28,6 +28,62 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 camera.position.set(10, 10, 10); // Isometric position
 camera.lookAt(0, 0, 0); // Look at the center of the scene
 
+// Mouse rotation controls
+let rotation = new THREE.Vector2(); // yaw only
+let isMouseDown = false;
+let targetRotation = 0; // Store target rotation
+let currentRotation = 0; // Store current rotation
+
+window.addEventListener("mousedown", () => isMouseDown = true);
+window.addEventListener("mouseup", () => isMouseDown = false);
+window.addEventListener("mousemove", (e) => {
+    if (isMouseDown) {
+        // Only allow rotation when character is not moving
+        if (!keys.w && !keys.a && !keys.s && !keys.d) {
+            targetRotation -= e.movementX * 0.01; // Increased rotation speed
+        }
+    }
+});
+
+// Add mouse wheel zoom
+window.addEventListener("wheel", (e) => {
+    currentDistance += e.deltaY * 0.01;
+    currentDistance = Math.max(minDistance, Math.min(maxDistance, currentDistance));
+});
+
+function updateCamera() {
+    if (!character) return;
+    
+    // Check if character is moving
+    const isMoving = keys.w || keys.a || keys.s || keys.d;
+    
+    if (isMoving) {
+        // Reset rotation when character moves
+        targetRotation = 0;
+        currentRotation = 0;
+    } else {
+        // Smoothly interpolate to target rotation
+        currentRotation += (targetRotation - currentRotation) * 0.1;
+    }
+    
+    // Calculate camera position based on character position and rotation
+    const angle = Math.PI / 4 + currentRotation;
+    const offset = new THREE.Vector3(
+        currentDistance * Math.sin(angle),
+        currentDistance * Math.sin(Math.PI / 4),
+        currentDistance * Math.cos(angle)
+    );
+    
+    // Calculate desired position
+    const desiredPosition = character.position.clone().add(offset);
+    
+    // Smooth camera movement (lerp)
+    camera.position.lerp(desiredPosition, 0.1);
+    
+    // Look at the character
+    camera.lookAt(character.position);
+}
+
 // Renderer setup
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -80,44 +136,6 @@ const targetPosition = new THREE.Vector3();
 const minDistance = .75; // Reduced minimum distance from 3 to 1
 const maxDistance = 20;
 let currentDistance = 7;
-
-// Mouse rotation controls
-let rotation = new THREE.Vector2(); // yaw only
-let isMouseDown = false;
-
-window.addEventListener("mousedown", () => isMouseDown = true);
-window.addEventListener("mouseup", () => isMouseDown = false);
-window.addEventListener("mousemove", (e) => {
-  if (isMouseDown) {
-    rotation.x -= e.movementX * 0.002; // horizontal rotation only
-  }
-});
-
-// Add mouse wheel zoom
-window.addEventListener("wheel", (e) => {
-  currentDistance += e.deltaY * 0.01; // Increased zoom sensitivity from 0.01 to 0.1
-  currentDistance = Math.max(minDistance, Math.min(maxDistance, currentDistance));
-});
-
-function updateCamera() {
-    if (!character) return;
-    
-    // Calculate camera position based on character position
-    const offset = new THREE.Vector3(
-        currentDistance * Math.cos(Math.PI / 4), // 45 degrees
-        currentDistance * Math.sin(Math.PI / 4), // 45 degrees
-        currentDistance * Math.cos(Math.PI / 4)  // 45 degrees
-    );
-    
-    // Calculate desired position
-    const desiredPosition = character.position.clone().add(offset);
-    
-    // Smooth camera movement (lerp)
-    camera.position.lerp(desiredPosition, 0.1);
-    
-    // Look at the character
-    camera.lookAt(character.position);
-}
 
 // Animation setup
 let mixer;
@@ -322,6 +340,10 @@ gltfLoader.load(
                     child.material.envMapIntensity = 0.0;
                     child.material.envMap = null;
                     child.material.needsUpdate = true;
+
+                    // Add brightness control
+                    child.material.emissive = new THREE.Color(0x000000); // Start with no emission
+                    child.material.emissiveIntensity = 0.0; // Start with no emission intensity
                 }
 
                 // Add collision boxes to objects based on their names or size
@@ -742,4 +764,22 @@ renderer.domElement.addEventListener('webglcontextlost', (event) => {
     event.preventDefault();
 }, false);
 
-animate(); 
+animate();
+
+// Set map brightness to 80%
+setMapBrightness(0.8);
+
+// Add this function to control map brightness
+function setMapBrightness(intensity) {
+    scene.traverse((child) => {
+        if (child.isMesh && child.material) {
+            child.material.emissiveIntensity = intensity;
+            child.material.needsUpdate = true;
+        }
+    });
+}
+
+// Example usage:
+// setMapBrightness(0.5); // Set brightness to 50%
+// setMapBrightness(1.0); // Set brightness to 100%
+// setMapBrightness(0.0); // Set brightness to 0% 

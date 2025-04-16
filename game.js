@@ -123,6 +123,7 @@ let mixer;
 let idleAction;
 let runAction;
 let fastRunAction;
+let moonwalkAction;  // Add moonwalk action
 let currentAction;
 let character;
 let moveForward = false;
@@ -230,6 +231,24 @@ loader.load('character/ch_idle.fbx',
                         fastRunAction.play();
                         fastRunAction.stop(); // Start in idle state
                         console.log('Fast run animation ready:', fastRunClip.name);
+
+                        // Load moonwalk animation
+                        loader.load('character/ch_moonwalk.fbx',
+                            (moonwalkFbx) => {
+                                console.log('Moonwalk animation loaded successfully');
+                                const moonwalkClip = moonwalkFbx.animations[0];
+                                moonwalkAction = mixer.clipAction(moonwalkClip);
+                                moonwalkAction.play();
+                                moonwalkAction.stop(); // Start in idle state
+                                console.log('Moonwalk animation ready:', moonwalkClip.name);
+                            },
+                            (xhr) => {
+                                console.log((xhr.loaded / xhr.total * 100) + '% moonwalk animation loaded');
+                            },
+                            (error) => {
+                                console.error('Error loading moonwalk animation:', error);
+                            }
+                        );
                     },
                     (xhr) => {
                         console.log((xhr.loaded / xhr.total * 100) + '% fast run animation loaded');
@@ -272,10 +291,21 @@ function updateCharacterMovement() {
         // Determine current speed and animation
         const isSprinting = keys.shift;
         const currentSpeed = isSprinting ? sprintSpeed : moveSpeed;
-        const targetAction = isSprinting ? fastRunAction : runAction;
+        let targetAction;
+        
+        // Choose animation based on movement
+        if (keys.s) {
+            console.log('S key pressed, selecting moonwalk animation');
+            targetAction = moonwalkAction; // Use moonwalk when pressing S
+        } else if (isSprinting) {
+            targetAction = fastRunAction;
+        } else {
+            targetAction = runAction;
+        }
         
         // Update animation
         if (currentAction !== targetAction) {
+            console.log('Switching to animation:', targetAction ? targetAction.getClip().name : 'none');
             currentAction.fadeOut(0.2);
             targetAction.reset().fadeIn(0.2).play();
             currentAction = targetAction;

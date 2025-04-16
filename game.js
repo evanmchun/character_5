@@ -1,15 +1,26 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 // Scene setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB); // Sky blue background
 
+// Add environment map
+const envMapLoader = new THREE.CubeTextureLoader();
+const envMap = envMapLoader.load([
+    'https://threejs.org/examples/textures/cube/Park2/posx.jpg',
+    'https://threejs.org/examples/textures/cube/Park2/negx.jpg',
+    'https://threejs.org/examples/textures/cube/Park2/posy.jpg',
+    'https://threejs.org/examples/textures/cube/Park2/negy.jpg',
+    'https://threejs.org/examples/textures/cube/Park2/posz.jpg',
+    'https://threejs.org/examples/textures/cube/Park2/negz.jpg'
+]);
+scene.environment = envMap;
+
 // Camera setup
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 1, 3);
-camera.lookAt(0, 0, 0);
+camera.position.set(10, 10, 10); // Isometric position
+camera.lookAt(0, 0, 0); // Look at the center of the scene
 
 // Renderer setup
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -37,20 +48,75 @@ gridHelper.position.y = 0; // Grid at y = 0
 scene.add(gridHelper);
 
 // Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Increased intensity from 0.5 to 1.0
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(5, 5, 5);
-directionalLight.castShadow = true;
-scene.add(directionalLight);
+// Main directional light (sun)
+const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
+mainLight.position.set(5, 5, 2);
+mainLight.castShadow = true;
+mainLight.shadow.mapSize.width = 2048;
+mainLight.shadow.mapSize.height = 2048;
+mainLight.shadow.camera.near = 0.1;
+mainLight.shadow.camera.far = 100;
+scene.add(mainLight);
 
-// Controls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.minDistance = 1;
-controls.maxDistance = 10;
+// Fill light from the back
+const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+backLight.position.set(-5, 3, -5);
+backLight.castShadow = false;
+scene.add(backLight);
+
+// Fill light from the front
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+fillLight.position.set(2, 2, 5);
+fillLight.castShadow = false;
+scene.add(fillLight);
+
+// Setup your camera and target offset
+const cameraOffset = new THREE.Vector3(0, 2, -10); // Lowered height from 5 to 2
+const targetPosition = new THREE.Vector3();
+const minDistance = 1; // Reduced minimum distance from 3 to 1
+const maxDistance = 20;
+let currentDistance = 10;
+
+// Mouse rotation controls
+let rotation = new THREE.Vector2(); // yaw only
+let isMouseDown = false;
+
+window.addEventListener("mousedown", () => isMouseDown = true);
+window.addEventListener("mouseup", () => isMouseDown = false);
+window.addEventListener("mousemove", (e) => {
+  if (isMouseDown) {
+    rotation.x -= e.movementX * 0.002; // horizontal rotation only
+  }
+});
+
+// Add mouse wheel zoom
+window.addEventListener("wheel", (e) => {
+  currentDistance += e.deltaY * 0.01; // Increased zoom sensitivity from 0.01 to 0.1
+  currentDistance = Math.max(minDistance, Math.min(maxDistance, currentDistance));
+});
+
+function updateCamera() {
+    if (!character) return;
+    
+    // Calculate camera position based on character position
+    const offset = new THREE.Vector3(
+        currentDistance * Math.cos(Math.PI / 4), // 45 degrees
+        currentDistance * Math.sin(Math.PI / 4), // 45 degrees
+        currentDistance * Math.cos(Math.PI / 4)  // 45 degrees
+    );
+    
+    // Calculate desired position
+    const desiredPosition = character.position.clone().add(offset);
+    
+    // Smooth camera movement (lerp)
+    camera.position.lerp(desiredPosition, 0.1);
+    
+    // Look at the character
+    camera.lookAt(character.position);
+}
 
 // Animation setup
 let mixer;
@@ -110,11 +176,19 @@ loader.load('character/ch_idle.fbx',
         const scale = 0.5;
         character.scale.set(scale, scale, scale);
         
-        // Enable shadows for all meshes in the character
+        // Enable shadows and adjust material properties for all meshes in the character
         character.traverse((child) => {
             if (child.isMesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
+                
+                // Adjust material properties
+                if (child.material) {
+                    child.material.roughness = 1.0;  // Maximum roughness for matte appearance
+                    child.material.metalness = 0.0;  // No metallic reflection
+                    child.material.envMapIntensity = 0.0;  // No environment map reflection
+                    child.material.envMap = null;  // Remove environment map
+                }
             }
         });
         
@@ -181,18 +255,15 @@ loader.load('character/ch_idle.fbx',
     }
 );
 
-// Animation loop
-const clock = new THREE.Clock();
-
 function updateCharacterMovement() {
     if (!character) return;
 
     // Calculate movement direction
     const moveDirection = new THREE.Vector3();
-    if (keys.w) moveDirection.z -= 1;
-    if (keys.s) moveDirection.z += 1;
-    if (keys.a) moveDirection.x -= 1;
-    if (keys.d) moveDirection.x += 1;
+    if (keys.w) moveDirection.z += 1;
+    if (keys.s) moveDirection.z -= 1;
+    if (keys.a) moveDirection.x += 1;
+    if (keys.d) moveDirection.x -= 1;
 
     // Normalize movement vector
     if (moveDirection.length() > 0) {
@@ -227,6 +298,9 @@ function updateCharacterMovement() {
     }
 }
 
+// Animation loop
+const clock = new THREE.Clock();
+
 function animate() {
     requestAnimationFrame(animate);
     
@@ -238,7 +312,9 @@ function animate() {
     // Update character movement
     updateCharacterMovement();
     
-    controls.update();
+    // Update camera position
+    updateCamera();
+    
     renderer.render(scene, camera);
 }
 

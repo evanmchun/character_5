@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
+// Audio setup
+const audioLoader = new THREE.AudioLoader();
+const listener = new THREE.AudioListener();
+let moonwalkSound;
+
 // Scene setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB); // Sky blue background
@@ -274,6 +279,23 @@ loader.load('character/ch_idle.fbx',
     }
 );
 
+// Load moonwalk sound
+audioLoader.load('sounds/moonwalk.mp3', 
+    (buffer) => {
+        moonwalkSound = new THREE.Audio(listener);
+        moonwalkSound.setBuffer(buffer);
+        moonwalkSound.setLoop(false);
+        moonwalkSound.setVolume(0.5);
+        console.log('Moonwalk sound loaded successfully');
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% moonwalk sound loaded');
+    },
+    (error) => {
+        console.error('Error loading moonwalk sound:', error);
+    }
+);
+
 function updateCharacterMovement() {
     if (!character) return;
 
@@ -297,10 +319,23 @@ function updateCharacterMovement() {
         if (keys.s) {
             console.log('S key pressed, selecting moonwalk animation');
             targetAction = moonwalkAction; // Use moonwalk when pressing S
+            
+            // Play moonwalk sound if it's loaded
+            if (moonwalkSound && !moonwalkSound.isPlaying) {
+                moonwalkSound.play();
+            }
         } else if (isSprinting) {
             targetAction = fastRunAction;
+            // Stop moonwalk sound if it's playing
+            if (moonwalkSound && moonwalkSound.isPlaying) {
+                moonwalkSound.stop();
+            }
         } else {
             targetAction = runAction;
+            // Stop moonwalk sound if it's playing
+            if (moonwalkSound && moonwalkSound.isPlaying) {
+                moonwalkSound.stop();
+            }
         }
         
         // Update animation
@@ -339,6 +374,10 @@ function updateCharacterMovement() {
             currentAction.fadeOut(0.2);
             idleAction.reset().fadeIn(0.2).play();
             currentAction = idleAction;
+        }
+        // Stop moonwalk sound if it's playing
+        if (moonwalkSound && moonwalkSound.isPlaying) {
+            moonwalkSound.stop();
         }
     }
 }

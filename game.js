@@ -175,7 +175,7 @@ loader.load('character/ch_idle.fbx',
         character.scale.set(1, 1, 1);
         
         // Set the scale
-        const scale = 0.5;
+        const scale = 0.6;  // Increased from 0.5 to 0.6
         character.scale.set(scale, scale, scale);
         
         // Enable shadows and adjust material properties for all meshes in the character
@@ -343,9 +343,9 @@ gltfLoader.load(
                     const center = box.getCenter(new THREE.Vector3());
                     const size = box.getSize(new THREE.Vector3());
                     
-                    // Scale down the size (adjust these values to make boxes narrower)
-                    size.x *= 0.2;  // Make width 30% of original (was 0.5)
-                    size.z *= 0.4;  // Make depth 40% of original (was 0.7)
+                    // Adjust the size to make the box wider
+                    size.x *= 0.6;  // Increase width to 50% of original
+                    size.z *= 0.4;  // Keep depth 40% of original
                     
                     // Create new scaled box
                     const scaledBox = new THREE.Box3();
@@ -471,8 +471,39 @@ function createTexturedPlane(textures) {
     scene.add(plane3);
 }
 
+// Add a collision box at the specified coordinates
+const debugBoxPosition = new THREE.Vector3(4.46, 1.00, -4.31);
+const debugBoxSize = new THREE.Vector3(1, 2, 1); // Adjust size as needed
+
+// Create a visible mesh for the collision box
+const debugBoxGeometry = new THREE.BoxGeometry(debugBoxSize.x, debugBoxSize.y, debugBoxSize.z);
+const debugBoxMaterial = new THREE.MeshStandardMaterial({
+    color: 0xff0000,
+    transparent: true,
+    opacity: 0.3,
+    wireframe: true
+});
+const debugBoxMesh = new THREE.Mesh(debugBoxGeometry, debugBoxMaterial);
+debugBoxMesh.position.copy(debugBoxPosition);
+scene.add(debugBoxMesh);
+
+// Create the collision box
+const debugBox = new THREE.Box3().setFromCenterAndSize(debugBoxPosition, debugBoxSize);
+
+// Add the collision box to the collisionObjects array
+collisionObjects.push({
+    box: debugBox,
+    object: debugBoxMesh, // Now we have a proper mesh object
+    name: 'Debug Box'
+});
+
 // Modify the collision detection function
-function checkCollision(position, radius = 0.5) {
+function checkCollision(position, radius = 0.8) {
+    if (!position) {
+        console.warn('Invalid position provided to checkCollision');
+        return false;
+    }
+
     const characterBox = new THREE.Box3();
     const characterSize = new THREE.Vector3(radius * 2, 2, radius * 2);
     characterBox.setFromCenterAndSize(position, characterSize);
@@ -480,35 +511,50 @@ function checkCollision(position, radius = 0.5) {
     let collisionDetected = false;
     
     for (const obj of collisionObjects) {
-        if (characterBox.intersectsBox(obj.box)) {
-            collisionDetected = true;
-            
-            // Highlight the colliding object
-            if (obj.object.isMesh) {
-                // Store original material if not already stored
-                if (!originalMaterials.has(obj.object)) {
-                    originalMaterials.set(obj.object, obj.object.material.clone());
+        // Skip invalid collision objects
+        if (!obj || !obj.box) {
+            console.warn('Invalid collision object found:', obj);
+            continue;
+        }
+
+        try {
+            if (characterBox.intersectsBox(obj.box)) {
+                collisionDetected = true;
+                
+                // Log collision with debug box
+                if (obj.name === 'Debug Box') {
+                    console.log('Collision with debug box detected!');
                 }
                 
-                // Create highlight material
-                const highlightMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xff0000, // Red highlight
-                    transparent: true,
-                    opacity: 0.5
-                });
-                
-                // Apply highlight material
-                obj.object.material = highlightMaterial;
-                
-                // Log detailed collision information
-                console.log(`Collision with: ${obj.name}`);
-                console.log(`Object position: ${obj.object.position.x.toFixed(2)}, ${obj.object.position.y.toFixed(2)}, ${obj.object.position.z.toFixed(2)}`);
-                console.log(`Character position: ${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)}`);
+                // Only try to highlight if the object is valid and is a mesh
+                if (obj.object && obj.object.isMesh) {
+                    // Store original material if not already stored
+                    if (!originalMaterials.has(obj.object)) {
+                        originalMaterials.set(obj.object, obj.object.material.clone());
+                    }
+                    
+                    // Create highlight material
+                    const highlightMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xff0000, // Red highlight
+                        transparent: true,
+                        opacity: 0.5
+                    });
+                    
+                    // Apply highlight material
+                    obj.object.material = highlightMaterial;
+                }
+            } else {
+                // Restore original material if not colliding
+                if (obj.object && obj.object.isMesh && originalMaterials.has(obj.object)) {
+                    obj.object.material = originalMaterials.get(obj.object);
+                }
             }
-        } else {
-            // Restore original material if not colliding
-            if (obj.object.isMesh && originalMaterials.has(obj.object)) {
-                obj.object.material = originalMaterials.get(obj.object);
+        } catch (error) {
+            console.error('Error in collision detection:', error);
+            // Remove invalid collision object
+            const index = collisionObjects.indexOf(obj);
+            if (index > -1) {
+                collisionObjects.splice(index, 1);
             }
         }
     }

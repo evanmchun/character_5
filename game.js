@@ -338,18 +338,25 @@ function updateCharacterMovement() {
 
         // Only rotate when moving sideways (A or D)
         if (keys.a || keys.d) {
+            // Calculate target rotation based on movement direction
             const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
             
-            // Handle angle wrapping for smooth rotation
-            let currentRotation = character.rotation.y;
-            let diff = targetRotation - currentRotation;
+            // Get current rotation
+            const currentRotation = character.rotation.y;
             
-            // Normalize the difference to the shortest path
-            if (diff > Math.PI) diff -= 2 * Math.PI;
-            if (diff < -Math.PI) diff += 2 * Math.PI;
+            // Calculate the shortest rotation angle
+            let angleDiff = targetRotation - currentRotation;
             
-            // Apply the rotation
-            character.rotation.y = currentRotation + diff * rotateSpeed;
+            // Normalize the angle difference to [-PI, PI]
+            while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+            while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+            
+            // Apply smooth rotation
+            character.rotation.y += angleDiff * rotateSpeed;
+            
+            // Ensure rotation stays within valid range
+            if (character.rotation.y > Math.PI) character.rotation.y -= 2 * Math.PI;
+            if (character.rotation.y < -Math.PI) character.rotation.y += 2 * Math.PI;
         }
     } else {
         // Return to idle animation

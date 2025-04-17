@@ -2,17 +2,101 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-// Audio setup
-const audioLoader = new THREE.AudioLoader();
-const listener = new THREE.AudioListener();
-let moonwalkSound;
-
 // Scene setup
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB); // Sky blue background
 
+// Renderer setup
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+document.body.appendChild(renderer.domElement);
+
+// Create loading manager
+const loadingManager = new THREE.LoadingManager();
+const loadingScreen = document.createElement('div');
+loadingScreen.style.position = 'fixed';
+loadingScreen.style.top = '0';
+loadingScreen.style.left = '0';
+loadingScreen.style.width = '100%';
+loadingScreen.style.height = '100%';
+loadingScreen.style.background = 'rgba(0, 0, 0, 0.9)';
+loadingScreen.style.display = 'flex';
+loadingScreen.style.flexDirection = 'column';
+loadingScreen.style.justifyContent = 'center';
+loadingScreen.style.alignItems = 'center';
+loadingScreen.style.zIndex = '1000';
+
+// Create loading text
+const loadingText = document.createElement('h1');
+loadingText.textContent = 'Loading...';
+loadingText.style.color = 'white';
+loadingText.style.fontFamily = 'Arial, sans-serif';
+loadingText.style.marginBottom = '20px';
+
+// Create progress bar container
+const progressBarContainer = document.createElement('div');
+progressBarContainer.style.width = '50%';
+progressBarContainer.style.height = '20px';
+progressBarContainer.style.background = '#333';
+progressBarContainer.style.borderRadius = '10px';
+progressBarContainer.style.overflow = 'hidden';
+
+// Create progress bar
+const progressBar = document.createElement('div');
+progressBar.style.width = '0%';
+progressBar.style.height = '100%';
+progressBar.style.background = '#4CAF50';
+progressBar.style.transition = 'width 0.3s ease-in-out';
+
+// Add elements to DOM
+progressBarContainer.appendChild(progressBar);
+loadingScreen.appendChild(loadingText);
+loadingScreen.appendChild(progressBarContainer);
+document.body.appendChild(loadingScreen);
+
+// Hide renderer initially
+renderer.domElement.style.display = 'none';
+
+// Update loading manager
+loadingManager.onProgress = function(url, itemsLoaded, itemsTotal) {
+    const progress = (itemsLoaded / itemsTotal) * 100;
+    progressBar.style.width = progress + '%';
+    loadingText.textContent = `Loading... ${Math.round(progress)}%`;
+};
+
+loadingManager.onLoad = function() {
+    // Fade out loading screen
+    loadingScreen.style.transition = 'opacity 1s ease-in-out';
+    loadingScreen.style.opacity = '0';
+    // Show renderer
+    renderer.domElement.style.display = 'block';
+    // Remove loading screen after fade
+    setTimeout(() => {
+        loadingScreen.remove();
+    }, 1000);
+};
+
+loadingManager.onError = function(url) {
+    console.error('Error loading:', url);
+    loadingText.textContent = 'Error loading assets. Please refresh the page.';
+    loadingText.style.color = '#ff0000';
+};
+
+// Update all loaders to use loading manager
+const textureLoader = new THREE.TextureLoader(loadingManager);
+const envMapLoader = new THREE.CubeTextureLoader(loadingManager);
+const loader = new FBXLoader(loadingManager);
+const gltfLoader = new GLTFLoader(loadingManager);
+
+// Audio setup
+const audioLoader = new THREE.AudioLoader(loadingManager);
+const listener = new THREE.AudioListener();
+let moonwalkSound;
+
 // Add environment map
-const envMapLoader = new THREE.CubeTextureLoader();
 const envMap = envMapLoader.load([
     'https://threejs.org/examples/textures/cube/Park2/posx.jpg',
     'https://threejs.org/examples/textures/cube/Park2/negx.jpg',
@@ -38,10 +122,7 @@ window.addEventListener("mousedown", () => isMouseDown = true);
 window.addEventListener("mouseup", () => isMouseDown = false);
 window.addEventListener("mousemove", (e) => {
     if (isMouseDown) {
-        // Only allow rotation when character is not moving
-        if (!keys.w && !keys.a && !keys.s && !keys.d) {
-            targetRotation -= e.movementX * 0.01; // Increased rotation speed
-        }
+        targetRotation -= e.movementX * 0.01; // Increased rotation speed
     }
 });
 
@@ -54,17 +135,8 @@ window.addEventListener("wheel", (e) => {
 function updateCamera() {
     if (!character) return;
     
-    // Check if character is moving
-    const isMoving = keys.w || keys.a || keys.s || keys.d;
-    
-    if (isMoving) {
-        // Reset rotation when character moves
-        targetRotation = 0;
-        currentRotation = 0;
-    } else {
-        // Smoothly interpolate to target rotation
-        currentRotation += (targetRotation - currentRotation) * 0.1;
-    }
+    // Smoothly interpolate to target rotation
+    currentRotation += (targetRotation - currentRotation) * 0.1;
     
     // Calculate camera position based on character position and rotation
     const angle = Math.PI / 4 + currentRotation;
@@ -83,14 +155,6 @@ function updateCamera() {
     // Look at the character
     camera.lookAt(character.position);
 }
-
-// Renderer setup
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
-document.body.appendChild(renderer.domElement);
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.9); // Reduced intensity for more shadow contrast
@@ -179,9 +243,6 @@ window.addEventListener('keyup', (event) => {
 });
 
 // Load FBX character
-const loader = new FBXLoader();
-
-// Load idle animation
 loader.load('character/ch_idle.fbx', 
     (fbx) => {
         console.log('Idle animation loaded successfully');
@@ -316,7 +377,6 @@ const originalMaterials = new Map(); // Store original materials
 
 // Modify map loading section
 // Load map
-const gltfLoader = new GLTFLoader();
 gltfLoader.load(
     'map/low-poly-eiffel-tower/source/map_effel.glb',
     (gltf) => {
@@ -409,7 +469,6 @@ gltfLoader.load(
 );
 
 // Create a textured plane
-const textureLoader = new THREE.TextureLoader();
 const textures = [
     'map/low-poly-eiffel-tower/source/textures/Image_0_0.png',
     'map/low-poly-eiffel-tower/source/textures/Image_0_1.png',

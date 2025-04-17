@@ -116,6 +116,35 @@ let moonwalkSound;
 let footstepSound;  // Add footstep sound variable
 let backgroundMusic;  // Add background music variable
 let isMusicMuted = false;  // Track music mute state
+let isFading = false;  // Track if music is currently fading
+
+// Function to fade music
+function fadeMusic(targetVolume, duration = 500) {
+    if (!backgroundMusic || isFading) return;
+    
+    isFading = true;
+    const startVolume = backgroundMusic.getVolume();
+    const startTime = Date.now();
+    
+    function fadeStep() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        if (progress < 1) {
+            const currentVolume = startVolume + (targetVolume - startVolume) * progress;
+            backgroundMusic.setVolume(currentVolume);
+            requestAnimationFrame(fadeStep);
+        } else {
+            backgroundMusic.setVolume(targetVolume);
+            if (targetVolume === 0) {
+                backgroundMusic.pause();
+            }
+            isFading = false;
+        }
+    }
+    
+    fadeStep();
+}
 
 // Add environment map
 const envMap = envMapLoader.load([
@@ -163,7 +192,7 @@ function updateCamera() {
     const angle = Math.PI / 4 + currentRotation;
     const offset = new THREE.Vector3(
         currentDistance * Math.sin(angle),
-        currentDistance * Math.sin(Math.PI / 4),
+        currentDistance * Math.sin(Math.PI / 4) + 0, // Added vertical offset
         currentDistance * Math.cos(angle)
     );
     
@@ -173,8 +202,10 @@ function updateCamera() {
     // Smooth camera movement (lerp)
     camera.position.lerp(desiredPosition, 0.1);
     
-    // Look at the character
-    camera.lookAt(character.position);
+    // Look at a point slightly above the character's position
+    const lookAtPosition = character.position.clone();
+    lookAtPosition.y += .75; // Look at point above character's center
+    camera.lookAt(lookAtPosition);
 }
 
 // Lighting
@@ -218,9 +249,9 @@ scene.add(hemiLight);
 // Setup your camera and target offset
 const cameraOffset = new THREE.Vector3(0, 2, -10); // Lowered height from 5 to 2
 const targetPosition = new THREE.Vector3();
-const minDistance = .75; // Reduced minimum distance from 3 to 1
+const minDistance = 0.75; // Changed back to original minimum distance
 const maxDistance = 20;
-let currentDistance = 7;
+let currentDistance = 5;
 
 // Animation setup
 let mixer;
@@ -250,6 +281,10 @@ const keys = {
 window.addEventListener('keydown', (event) => {
     if (event.key.toLowerCase() in keys) {
         keys[event.key.toLowerCase()] = true;
+        // Fade out background music when S is pressed
+        if (event.key.toLowerCase() === 's' && backgroundMusic && !isMusicMuted) {
+            fadeMusic(0, 300);  // Fade to silence over 300ms
+        }
     } else if (event.key === 'Shift') {
         keys.shift = true;
     }
@@ -258,6 +293,11 @@ window.addEventListener('keydown', (event) => {
 window.addEventListener('keyup', (event) => {
     if (event.key.toLowerCase() in keys) {
         keys[event.key.toLowerCase()] = false;
+        // Fade in background music when S is released
+        if (event.key.toLowerCase() === 's' && backgroundMusic && !isMusicMuted) {
+            backgroundMusic.play();
+            fadeMusic(0.2, 300);  // Fade to 20% volume over 300ms
+        }
     } else if (event.key === 'Shift') {
         keys.shift = false;
     }
@@ -381,7 +421,7 @@ audioLoader.load('sounds/moonwalk.mp3',
         moonwalkSound = new THREE.Audio(listener);
         moonwalkSound.setBuffer(buffer);
         moonwalkSound.setLoop(false);
-        moonwalkSound.setVolume(0.5);
+        moonwalkSound.setVolume(0.3);  // Reduced volume from 0.5 to 0.3
         console.log('Moonwalk sound loaded successfully');
     },
     (xhr) => {
@@ -415,7 +455,7 @@ audioLoader.load('sounds/background_music.mp3',
         backgroundMusic = new THREE.Audio(listener);
         backgroundMusic.setBuffer(buffer);
         backgroundMusic.setLoop(true);  // Make it loop continuously
-        backgroundMusic.setVolume(0.3);  // Set volume to 30% to not overpower other sounds
+        backgroundMusic.setVolume(0.2);  // Reduced volume from 0.3 to 0.2
         backgroundMusic.play();  // Start playing the background music
         console.log('Background music loaded successfully');
     },
@@ -951,13 +991,14 @@ muteButton.addEventListener('click', () => {
     if (backgroundMusic) {
         isMusicMuted = !isMusicMuted;
         if (isMusicMuted) {
-            backgroundMusic.pause();
-            speakerIcon.textContent = '🔇';  // Muted speaker emoji
-            muteButton.style.backgroundColor = '#ff4444';  // Red when muted
+            fadeMusic(0, 300);  // Fade out when muting
+            speakerIcon.textContent = '🔇';
+            muteButton.style.backgroundColor = '#ff4444';
         } else {
             backgroundMusic.play();
-            speakerIcon.textContent = '🔊';  // Speaker emoji
-            muteButton.style.backgroundColor = '#ffffff';  // White when playing
+            fadeMusic(0.2, 300);  // Fade in when unmuting
+            speakerIcon.textContent = '🔊';
+            muteButton.style.backgroundColor = '#ffffff';
         }
     }
 });

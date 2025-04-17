@@ -115,6 +115,7 @@ const listener = new THREE.AudioListener();
 let moonwalkSound;
 let footstepSound;  // Add footstep sound variable
 let backgroundMusic;  // Add background music variable
+let fallingSound;  // Add falling sound variable
 let isMusicMuted = false;  // Track music mute state
 let isFading = false;  // Track if music is currently fading
 
@@ -259,6 +260,7 @@ let idleAction;
 let runAction;
 let fastRunAction;
 let moonwalkAction;  // Add moonwalk action
+let fallingAction;  // Add falling action
 let currentAction;
 let character;
 let moveForward = false;
@@ -382,6 +384,24 @@ loader.load('character/ch_idle.fbx',
                                 moonwalkAction.play();
                                 moonwalkAction.stop(); // Start in idle state
                                 console.log('Moonwalk animation ready:', moonwalkClip.name);
+
+                                // Load falling animation
+                                loader.load('character/ch_falling.fbx',
+                                    (fallingFbx) => {
+                                        console.log('Falling animation loaded successfully');
+                                        const fallingClip = fallingFbx.animations[0];
+                                        fallingAction = mixer.clipAction(fallingClip);
+                                        fallingAction.play();
+                                        fallingAction.stop(); // Start in idle state
+                                        console.log('Falling animation ready:', fallingClip.name);
+                                    },
+                                    (xhr) => {
+                                        console.log((xhr.loaded / xhr.total * 100) + '% falling animation loaded');
+                                    },
+                                    (error) => {
+                                        console.error('Error loading falling animation:', error);
+                                    }
+                                );
                             },
                             (xhr) => {
                                 console.log((xhr.loaded / xhr.total * 100) + '% moonwalk animation loaded');
@@ -467,6 +487,23 @@ audioLoader.load('sounds/background_music.mp3',
     }
 );
 
+// Load falling sound
+audioLoader.load('sounds/falling.mp3', 
+    (buffer) => {
+        fallingSound = new THREE.Audio(listener);
+        fallingSound.setBuffer(buffer);
+        fallingSound.setLoop(false);  // Don't loop the falling sound
+        fallingSound.setVolume(0.5);
+        console.log('Falling sound loaded successfully');
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% falling sound loaded');
+    },
+    (error) => {
+        console.error('Error loading falling sound:', error);
+    }
+);
+
 // Add after scene setup
 const collisionObjects = [];
 const originalMaterials = new Map(); // Store original materials
@@ -522,8 +559,8 @@ gltfLoader.load(
                     const size = box.getSize(new THREE.Vector3());
                     
                     // Adjust the size to make the box wider
-                    size.x *= 0.6;  // Increase width to 50% of original
-                    size.z *= 0.4;  // Keep depth 40% of original
+                    size.x *= 0.05;  // Increase width to 50% of original
+                    size.z *= 0.05;  // Keep depth 40% of original
                     
                     // Create new scaled box
                     const scaledBox = new THREE.Box3();
@@ -771,6 +808,16 @@ function updateCharacterMovement() {
     if (isOffMap && !isFalling) {
         isFalling = true;
         verticalVelocity = 0;
+        // Switch to falling animation
+        if (currentAction !== fallingAction) {
+            currentAction.fadeOut(0.2);
+            fallingAction.reset().fadeIn(0.2).play();
+            currentAction = fallingAction;
+        }
+        // Play falling sound
+        if (fallingSound && !fallingSound.isPlaying) {
+            fallingSound.play();
+        }
     }
 
     if (isFalling) {
@@ -779,11 +826,21 @@ function updateCharacterMovement() {
         character.position.y += verticalVelocity;
 
         // Keep falling until character is very far below
-        if (character.position.y < -600) {
+        if (character.position.y < -300) {
             // Reset character position to map center
             character.position.set(0, 1, 0);
             isFalling = false;
             verticalVelocity = 0;
+            // Return to idle animation
+            if (currentAction !== idleAction) {
+                currentAction.fadeOut(0.2);
+                idleAction.reset().fadeIn(0.2).play();
+                currentAction = idleAction;
+            }
+            // Stop falling sound
+            if (fallingSound && fallingSound.isPlaying) {
+                fallingSound.stop();
+            }
         }
         return; // Skip normal movement while falling
     }
@@ -1047,10 +1104,10 @@ muteButton.addEventListener('mouseleave', () => {
 document.body.appendChild(muteButton);
 
 const mapBounds = {
-    minX: -20,
-    maxX: 20,
-    minZ: -20,
-    maxZ: 20
+    minX: -20.25,
+    maxX: 20.25,
+    minZ: -20.25,
+    maxZ: 20.25
 };
 
 // Add visual boundaries

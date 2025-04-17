@@ -94,6 +94,103 @@ loadingManager.onLoad = function() {
     // Remove loading screen after fade
     setTimeout(() => {
         loadingScreen.remove();
+        
+        // Create instructions overlay
+        const instructionsDiv = document.createElement('div');
+        instructionsDiv.style.position = 'fixed';
+        instructionsDiv.style.top = '20px';
+        instructionsDiv.style.left = '20px';
+        instructionsDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        instructionsDiv.style.color = 'white';
+        instructionsDiv.style.padding = '20px';
+        instructionsDiv.style.borderRadius = '10px';
+        instructionsDiv.style.fontFamily = 'Arial, sans-serif';
+        instructionsDiv.style.maxWidth = '300px';
+        instructionsDiv.style.zIndex = '1000';
+
+        // Set the content first
+        instructionsDiv.innerHTML = `
+            <h2 style="margin-top: 0;">How to Play</h2>
+            <h3>Movement</h3>
+            <ul style="list-style: none; padding-left: 0;">
+                <li>🡅 W - Move forward</li>
+                <li>🡄 A - Move left</li>
+                <li>🡇 S - Move backward (moonwalk)</li>
+                <li>🡆 D - Move right</li>
+                <li>⇧ Shift - Sprint</li>
+            </ul>
+            <h3>Features</h3>
+            <ul style="list-style: none; padding-left: 0;">
+                <li>🎵 Background music</li>
+                <li>💃 Special moonwalk animation</li>
+                <li>⚠️ Stay within map boundaries</li>
+            </ul>
+        `;
+
+        // Add close button after setting content
+        const closeButton = document.createElement('button');
+        closeButton.innerHTML = '×';
+        closeButton.style.position = 'absolute';
+        closeButton.style.top = '5px';
+        closeButton.style.right = '5px';
+        closeButton.style.background = 'none';
+        closeButton.style.border = 'none';
+        closeButton.style.color = 'white';
+        closeButton.style.fontSize = '24px';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.padding = '5px 10px';
+        closeButton.style.borderRadius = '50%';
+        closeButton.style.transition = 'background-color 0.3s';
+
+        closeButton.addEventListener('mouseenter', () => {
+            closeButton.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        });
+
+        closeButton.addEventListener('mouseleave', () => {
+            closeButton.style.backgroundColor = 'transparent';
+        });
+
+        instructionsDiv.appendChild(closeButton);
+        document.body.appendChild(instructionsDiv);
+
+        // Create help icon
+        const helpIcon = document.createElement('button');
+        helpIcon.innerHTML = '❓';
+        helpIcon.style.position = 'fixed';
+        helpIcon.style.top = '20px';
+        helpIcon.style.left = '20px';
+        helpIcon.style.width = '40px';
+        helpIcon.style.height = '40px';
+        helpIcon.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        helpIcon.style.color = 'white';
+        helpIcon.style.border = 'none';
+        helpIcon.style.borderRadius = '50%';
+        helpIcon.style.cursor = 'pointer';
+        helpIcon.style.fontSize = '20px';
+        helpIcon.style.display = 'none';
+        helpIcon.style.zIndex = '1000';
+        helpIcon.style.transition = 'transform 0.3s';
+
+        helpIcon.addEventListener('mouseenter', () => {
+            helpIcon.style.transform = 'scale(1.1)';
+        });
+
+        helpIcon.addEventListener('mouseleave', () => {
+            helpIcon.style.transform = 'scale(1)';
+        });
+
+        document.body.appendChild(helpIcon);
+
+        // Add click handlers
+        closeButton.addEventListener('click', () => {
+            instructionsDiv.style.display = 'none';
+            helpIcon.style.display = 'block';
+        });
+
+        helpIcon.addEventListener('click', () => {
+            instructionsDiv.style.display = 'block';
+            helpIcon.style.display = 'none';
+        });
     }, 1000);
 };
 
@@ -228,6 +325,7 @@ mainLight.shadow.camera.right = 100;
 mainLight.shadow.camera.top = 100;
 mainLight.shadow.camera.bottom = -100;
 mainLight.shadow.bias = -0.001;  // Reduce shadow acne
+
 scene.add(mainLight);
 
 // Fill light from the back
@@ -312,7 +410,7 @@ loader.load('character/ch_idle.fbx',
         character = fbx;
         
         // Reset transformations
-        character.position.set(6.5, 1, -7); // Changed to specified starting position
+        character.position.set(6.5, 0.99, -7); // Set initial position
         character.rotation.set(0, Math.PI*.25, 0); // Rotated 180 degrees to face camera
         character.scale.set(1, 1, 1);
         
@@ -338,15 +436,6 @@ loader.load('character/ch_idle.fbx',
         
         scene.add(character);
         
-        // Position the character manually
-        character.position.y = 1; // Changed y position to 1 to lift character above the plane
-        
-        // Add transparent bounding box
-        const boxHelper = new THREE.BoxHelper(character, 0xffff00);
-        boxHelper.material.transparent = true;
-        boxHelper.material.opacity = .0;
-        scene.add(boxHelper);
-
         // Set up idle animation
         mixer = new THREE.AnimationMixer(character);
         const idleClip = fbx.animations[0];
@@ -828,7 +917,7 @@ function updateCharacterMovement() {
         // Keep falling until character is very far below
         if (character.position.y < -300) {
             // Reset character position to map center
-            character.position.set(0, 1, 0);
+            character.position.set(0, 0.99, 0); // Match the new height
             isFalling = false;
             verticalVelocity = 0;
             // Return to idle animation

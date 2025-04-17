@@ -95,6 +95,7 @@ const gltfLoader = new GLTFLoader(loadingManager);
 const audioLoader = new THREE.AudioLoader(loadingManager);
 const listener = new THREE.AudioListener();
 let moonwalkSound;
+let footstepSound;  // Add footstep sound variable
 
 // Add environment map
 const envMap = envMapLoader.load([
@@ -368,6 +369,23 @@ audioLoader.load('sounds/moonwalk.mp3',
     },
     (error) => {
         console.error('Error loading moonwalk sound:', error);
+    }
+);
+
+// Load footstep sound
+audioLoader.load('sounds/footsteps.mp3', 
+    (buffer) => {
+        footstepSound = new THREE.Audio(listener);
+        footstepSound.setBuffer(buffer);
+        footstepSound.setLoop(true);  // Make it loop
+        footstepSound.setVolume(0.5);
+        console.log('Footstep sound loaded successfully');
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% footstep sound loaded');
+    },
+    (error) => {
+        console.error('Error loading footstep sound:', error);
     }
 );
 
@@ -716,17 +734,35 @@ function updateCharacterMovement() {
             if (moonwalkSound && !moonwalkSound.isPlaying) {
                 moonwalkSound.play();
             }
+            // Stop footstep sound if playing
+            if (footstepSound && footstepSound.isPlaying) {
+                footstepSound.stop();
+            }
         } else if (isSprinting) {
             targetAction = fastRunAction;
             // Stop moonwalk sound if it's playing
             if (moonwalkSound && moonwalkSound.isPlaying) {
                 moonwalkSound.stop();
             }
+            // Play footstep sound if moving forward with increased speed
+            if (keys.w && footstepSound) {
+                if (!footstepSound.isPlaying) {
+                    footstepSound.play();
+                }
+                footstepSound.playbackRate = 1.5; // Speed up footsteps when sprinting
+            }
         } else {
             targetAction = runAction;
             // Stop moonwalk sound if it's playing
             if (moonwalkSound && moonwalkSound.isPlaying) {
                 moonwalkSound.stop();
+            }
+            // Play footstep sound if moving forward with normal speed
+            if (keys.w && footstepSound) {
+                if (!footstepSound.isPlaying) {
+                    footstepSound.play();
+                }
+                footstepSound.playbackRate = 1.0; // Normal speed for walking
             }
         }
         
@@ -786,6 +822,10 @@ function updateCharacterMovement() {
         // Stop moonwalk sound if it's playing
         if (moonwalkSound && moonwalkSound.isPlaying) {
             moonwalkSound.stop();
+        }
+        // Stop footstep sound if it's playing
+        if (footstepSound && footstepSound.isPlaying) {
+            footstepSound.stop();
         }
     }
 }

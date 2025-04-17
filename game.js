@@ -14,6 +14,24 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
 document.body.appendChild(renderer.domElement);
 
+// Hide mouse cursor when over the canvas
+renderer.domElement.style.cursor = 'none';
+
+// Add ESC key functionality for cursor visibility
+let isCursorVisible = false;
+window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        isCursorVisible = !isCursorVisible;
+        renderer.domElement.style.cursor = isCursorVisible ? 'default' : 'none';
+    }
+});
+
+// Hide cursor when clicking on the canvas
+renderer.domElement.addEventListener('click', () => {
+    isCursorVisible = false;
+    renderer.domElement.style.cursor = 'none';
+});
+
 // Create loading manager
 const loadingManager = new THREE.LoadingManager();
 const loadingScreen = document.createElement('div');
@@ -96,6 +114,8 @@ const audioLoader = new THREE.AudioLoader(loadingManager);
 const listener = new THREE.AudioListener();
 let moonwalkSound;
 let footstepSound;  // Add footstep sound variable
+let backgroundMusic;  // Add background music variable
+let isMusicMuted = false;  // Track music mute state
 
 // Add environment map
 const envMap = envMapLoader.load([
@@ -386,6 +406,24 @@ audioLoader.load('sounds/footsteps.mp3',
     },
     (error) => {
         console.error('Error loading footstep sound:', error);
+    }
+);
+
+// Load background music
+audioLoader.load('sounds/background_music.mp3', 
+    (buffer) => {
+        backgroundMusic = new THREE.Audio(listener);
+        backgroundMusic.setBuffer(buffer);
+        backgroundMusic.setLoop(true);  // Make it loop continuously
+        backgroundMusic.setVolume(0.3);  // Set volume to 30% to not overpower other sounds
+        backgroundMusic.play();  // Start playing the background music
+        console.log('Background music loaded successfully');
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% background music loaded');
+    },
+    (error) => {
+        console.error('Error loading background music:', error);
     }
 );
 
@@ -881,4 +919,57 @@ function setMapBrightness(intensity) {
 // Example usage:
 // setMapBrightness(0.5); // Set brightness to 50%
 // setMapBrightness(1.0); // Set brightness to 100%
-// setMapBrightness(0.0); // Set brightness to 0% 
+// setMapBrightness(0.0); // Set brightness to 0%
+
+// Create mute button
+const muteButton = document.createElement('button');
+muteButton.style.position = 'fixed';
+muteButton.style.bottom = '20px';
+muteButton.style.right = '20px';
+muteButton.style.width = '50px';
+muteButton.style.height = '50px';
+muteButton.style.borderRadius = '50%';
+muteButton.style.border = 'none';
+muteButton.style.backgroundColor = '#ffffff';
+muteButton.style.cursor = 'pointer';
+muteButton.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+muteButton.style.display = 'flex';
+muteButton.style.justifyContent = 'center';
+muteButton.style.alignItems = 'center';
+muteButton.style.transition = 'all 0.3s ease';
+muteButton.style.cursor = 'pointer';  // Show pointer cursor for the button
+
+// Add speaker icon
+const speakerIcon = document.createElement('i');
+speakerIcon.style.fontSize = '24px';
+speakerIcon.style.color = '#333333';
+speakerIcon.textContent = '🔊';  // Speaker emoji
+muteButton.appendChild(speakerIcon);
+
+// Add click event listener
+muteButton.addEventListener('click', () => {
+    if (backgroundMusic) {
+        isMusicMuted = !isMusicMuted;
+        if (isMusicMuted) {
+            backgroundMusic.pause();
+            speakerIcon.textContent = '🔇';  // Muted speaker emoji
+            muteButton.style.backgroundColor = '#ff4444';  // Red when muted
+        } else {
+            backgroundMusic.play();
+            speakerIcon.textContent = '🔊';  // Speaker emoji
+            muteButton.style.backgroundColor = '#ffffff';  // White when playing
+        }
+    }
+});
+
+// Add hover effect
+muteButton.addEventListener('mouseenter', () => {
+    muteButton.style.transform = 'scale(1.1)';
+});
+
+muteButton.addEventListener('mouseleave', () => {
+    muteButton.style.transform = 'scale(1)';
+});
+
+// Add the button to the document
+document.body.appendChild(muteButton); 

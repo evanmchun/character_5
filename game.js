@@ -753,9 +753,40 @@ function restoreOriginalMaterials() {
 let lastLogTime = 0;
 const LOG_INTERVAL = 1000; // Log every 1000ms (1 second)
 
+// Add gravity and falling variables
+const gravity = 0.01;
+let isFalling = false;
+let verticalVelocity = 0;
+
 // Modify updateCharacterMovement function
 function updateCharacterMovement() {
     if (!character) return;
+
+    // Check if character is off the map
+    const isOffMap = character.position.x < mapBounds.minX || 
+                    character.position.x > mapBounds.maxX || 
+                    character.position.z < mapBounds.minZ || 
+                    character.position.z > mapBounds.maxZ;
+
+    if (isOffMap && !isFalling) {
+        isFalling = true;
+        verticalVelocity = 0;
+    }
+
+    if (isFalling) {
+        // Apply gravity
+        verticalVelocity -= gravity;
+        character.position.y += verticalVelocity;
+
+        // Keep falling until character is very far below
+        if (character.position.y < -600) {
+            // Reset character position to map center
+            character.position.set(0, 1, 0);
+            isFalling = false;
+            verticalVelocity = 0;
+        }
+        return; // Skip normal movement while falling
+    }
 
     // Log position information periodically
     const currentTime = Date.now();
@@ -1013,4 +1044,31 @@ muteButton.addEventListener('mouseleave', () => {
 });
 
 // Add the button to the document
-document.body.appendChild(muteButton); 
+document.body.appendChild(muteButton);
+
+const mapBounds = {
+    minX: -20,
+    maxX: 20,
+    minZ: -20,
+    maxZ: 20
+};
+
+// Add visual boundaries
+const boundaryGeometry = new THREE.BoxGeometry(
+    mapBounds.maxX - mapBounds.minX,
+    0.1,  // Height of the boundary
+    mapBounds.maxZ - mapBounds.minZ
+);
+const boundaryMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff0000,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.5
+});
+const boundaryBox = new THREE.Mesh(boundaryGeometry, boundaryMaterial);
+boundaryBox.position.set(
+    (mapBounds.maxX + mapBounds.minX) / 2,
+    0.05,  // Slightly above ground
+    (mapBounds.maxZ + mapBounds.minZ) / 2
+);
+scene.add(boundaryBox); 
